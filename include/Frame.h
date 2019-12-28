@@ -116,7 +116,7 @@ public:
     // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
     void ComputeStereoFromRGBD(const cv::Mat &imDepth);
 
-    void ComputeStereoFromRGBD(const cv::Mat &imDepth, const cv::Mat &Tcr_real);
+    void ComputeStereoFromRGBD(const cv::Mat &imDepth, const vector<MapPoint *> &MapPointMatches);
 
     // Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
     cv::Mat UnprojectStereo(const int &i);
@@ -188,6 +188,7 @@ public:
 
     // 真实位姿
     cv::Mat mTcw_real;
+    cv::Mat mTcr_real;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;

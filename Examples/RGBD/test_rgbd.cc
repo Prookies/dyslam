@@ -101,7 +101,7 @@ int main(int argc, char** argv)
                           Rcw_real(2,0),Rcw_real(2,1),Rcw_real(2,2),tcw_real(2),
                           0,0,0,1);
 
-    cout << "opencv real Tcw: " << endl << cvTcw_real << endl;
+//    cout << "opencv real Tcw: " << endl << cvTcw_real << endl;
 
 
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
@@ -123,9 +123,6 @@ int main(int argc, char** argv)
 //          Tcw.at<float>(2,0),Tcw.at<float>(2,1),Tcw.at<float>(2,2);
 //      tcw_vision << Tcw.at<float>(0,3),Tcw.at<float>(1,3),Tcw.at<float>(2,3);
 
-
-
-//      cout << "当前帧真实位姿为：" << endl << Tcw_real.matrix() << endl;
 //      cout << "当前帧位姿为: " << endl << Tcw << endl;
 //      //        cout << "当前帧旋转为：" << endl << Rcw_vision << endl;
 //      //        cout << "当前帧位移为: " << endl << tcw_vision.transpose() << endl;
@@ -146,7 +143,7 @@ int main(int argc, char** argv)
     }
 
 
-    cv::waitKey(0);
+//    cv::waitKey(0);
 
     // Wait to load the next frame
     double T=0;

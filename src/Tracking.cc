@@ -264,10 +264,10 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD,
   //
   // TODO:记录时间
 
-  cout << "开始跟踪" << endl;
+//  cout << "开始跟踪" << endl;
   Track();
 
-  cout << "最新关键帧的位姿为：" << endl << mpLastKeyFrame->Tcw_real << endl;
+//  cout << "最新关键帧的位姿为：" << endl << mpLastKeyFrame->Tcw_real << endl;
 //  cout << "当前参考帧的位姿为：" << endl << mpReferenceKF->Tcw_real << endl;
 
   return mCurrentFrame.mTcw.clone();
@@ -1272,7 +1272,7 @@ bool Tracking::NeedNewKeyFrame() {
 // 找一个合适的位置增加一个等待语义分割的函数，以及一个滤出动态特征点的函数
 void Tracking::CreateNewKeyFrame() {
   // NOTE: 输出
-  cout << "创建关键帧" << endl;
+//  cout << "创建关键帧" << endl;
   if (!mpLocalMapper->SetNotStop(true))
     return;
 

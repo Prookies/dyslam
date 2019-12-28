@@ -53,10 +53,10 @@ Frame::Frame(const Frame &frame)
     mvScaleFactors(frame.mvScaleFactors), mvInvScaleFactors(frame.mvInvScaleFactors),
     mvLevelSigma2(frame.mvLevelSigma2), mvInvLevelSigma2(frame.mvInvLevelSigma2)
 {
-//  cout << "复制构造函数" << endl;
-//  cout << "复制真实位姿为：" << endl << frame.mTcw_real << endl;
+  //  cout << "复制构造函数" << endl;
+  //  cout << "复制真实位姿为：" << endl << frame.mTcw_real << endl;
   mTcw_real = frame.mTcw_real;
-//  cout << "复制构造函数完成" << endl;
+  //  cout << "复制构造函数完成" << endl;
 
   for(int i=0;i<FRAME_GRID_COLS;i++)
     for(int j=0; j<FRAME_GRID_ROWS; j++)
@@ -186,7 +186,6 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
   :mpORBvocabulary(voc),mpORBextractorLeft(extractor),mpORBextractorRight(static_cast<ORBextractor*>(NULL)),
     mTimeStamp(timeStamp), mK(K.clone()),mDistCoef(distCoef.clone()), mbf(bf), mThDepth(thDepth)
 {
-  cout << "创建帧" << endl;
   // Frame ID
   mnId=nNextId++;
 
@@ -204,6 +203,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
 
   // 可能需要增加关键帧
   mpReferenceKF = refKF;
+
+
   // ORB extraction
   // NOTE:对特征点提取的函数进行了改造
   // TODO:记录时间
@@ -217,6 +218,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
   UndistortKeyPoints();
 
   ComputeStereoFromRGBD(imDepth);
+
 
   mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
   mvbOutlier = vector<bool>(N,false);
@@ -350,6 +352,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat &imUsD
   // 获取真实位姿
   mTcw_real = Tcw_real;
 
+
   // ORB extraction
   // NOTE:对特征点提取的函数进行了改造
   // TODO:记录时间
@@ -380,7 +383,26 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat &imUsD
 
   UndistortKeyPoints();
 
-  ComputeStereoFromRGBD(imDepth);
+  if(mpReferenceKF != nullptr)
+  {
+    ComputeBoW();
+    ORBmatcher matcher(0.7, true);
+    vector<MapPoint *> MapPointMatches;
+    int nmatches = matcher.SearchByBoW(mpReferenceKF,*this, MapPointMatches);
+//    cout << "匹配的特征点数量为：" << nmatches << endl;
+    if(nmatches > 15)
+    {
+      ComputeStereoFromRGBD(imDepth, MapPointMatches);
+    }
+    else{
+      ComputeStereoFromRGBD(imDepth);
+    }
+
+  }
+  else{
+    ComputeStereoFromRGBD(imDepth);
+  }
+
 
   mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
   mvbOutlier = vector<bool>(N,false);
@@ -815,22 +837,50 @@ void Frame::ComputeStereoMatches()
   }
 }
 
-
-void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const cv::Mat &Tcr_real)
+// 通过三角化来恢复一些特征点的深度
+void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const vector<MapPoint *> &MapPointMatches)
 {
   mvuRight = vector<float>(N,-1);
   mvDepth = vector<float>(N,-1);
+  int dcount = 0;
 
-  // 获得参考帧与当前帧之间的位姿
-  if(mpReferenceKF!=nullptr)
+  for(int i=0; i<N; i++)
   {
-    cv::Mat Trw = mpReferenceKF->Tcw_real;
-    cv::Mat Tcr = mTcw_real*Trw.inv();
+    const cv::KeyPoint &kp = mvKeys[i];
+    const cv::KeyPoint &kpU = mvKeysUn[i];
+    MapPoint* pMP = MapPointMatches[i];
 
+    const float &v = kp.pt.y;
+    const float &u = kp.pt.x;
+
+    cv::Point2f pt(u,v);
+
+    const float d = imDepth.at<float>(v,u);
+
+    if(d>0)
+    {
+      mvDepth[i] = d;
+      mvuRight[i] = kpU.pt.x-mbf/d;
+    }
+    else{
+      if(pMP)
+      {
+        cv::Mat Pw = pMP->GetWorldPos();
+        cv::Mat Pc = mTcw_real.rowRange(0,3).colRange(0,3)*Pw + mTcw_real.rowRange(0,3).col(3);
+        float Projectd = Pc.at<float>(2);
+        mvDepth[i] = Projectd;
+        mvuRight[i] = kpU.pt.x-mbf/Projectd;
+        dcount++;
+      }
+    }
   }
+//  cout << "共还原了" << dcount << "个特征点的深度" << endl;
+}
 
-
-
+void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
+{
+  mvuRight = vector<float>(N,-1);
+  mvDepth = vector<float>(N,-1);
 
   for(int i=0; i<N; i++)
   {
@@ -840,8 +890,6 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const cv::Mat &Tcr_rea
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
 
-    cv::Point2f pt(v,u);
-
     const float d = imDepth.at<float>(v,u);
 
     if(d>0)
@@ -849,34 +897,7 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const cv::Mat &Tcr_rea
       mvDepth[i] = d;
       mvuRight[i] = kpU.pt.x-mbf/d;
     }
-//    else{
-//      // 如果不能直接获取深度信息，则三角化
-//      // g
-//    }
   }
-}
-
-void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
-{
-    mvuRight = vector<float>(N,-1);
-    mvDepth = vector<float>(N,-1);
-
-    for(int i=0; i<N; i++)
-    {
-        const cv::KeyPoint &kp = mvKeys[i];
-        const cv::KeyPoint &kpU = mvKeysUn[i];
-
-        const float &v = kp.pt.y;
-        const float &u = kp.pt.x;
-
-        const float d = imDepth.at<float>(v,u);
-
-        if(d>0)
-        {
-            mvDepth[i] = d;
-            mvuRight[i] = kpU.pt.x-mbf/d;
-        }
-    }
 }
 
 cv::Mat Frame::UnprojectStereo(const int &i)
