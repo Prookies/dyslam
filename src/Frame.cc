@@ -34,7 +34,7 @@ float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 const cv::Mat element_orb = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3,3));
-const cv::Mat element_remove = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(15,15));
+const cv::Mat element_remove = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(18,18));
 
 Frame::Frame()
 {}
@@ -386,7 +386,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat &imUsD
   if(mpReferenceKF != nullptr)
   {
     ComputeBoW();
-    ORBmatcher matcher(0.7, true);
+    ORBmatcher matcher(0.8, true);
     vector<MapPoint *> MapPointMatches;
     int nmatches = matcher.SearchByBoW(mpReferenceKF,*this, MapPointMatches);
 //    cout << "匹配的特征点数量为：" << nmatches << endl;
@@ -402,6 +402,8 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat &imUsD
   else{
     ComputeStereoFromRGBD(imDepth);
   }
+
+  // 将匹配的特征点投影到当前帧下
 
 
   mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
@@ -429,6 +431,7 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat &imUsD
 
   AssignFeaturesToGrid();
 }
+
 // 提取各层关键点
 void Frame::ExtractORBKeyPoints(const cv::Mat &im)
 {
@@ -852,8 +855,10 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const vector<MapPoint 
 
     const float &v = kp.pt.y;
     const float &u = kp.pt.x;
+//    const float &vU = kpU.pt.y;
+//    const float &uU = kpU.pt.x;
 
-    cv::Point2f pt(u,v);
+//    cv::Point2f pt(u,v);
 
     const float d = imDepth.at<float>(v,u);
 
@@ -870,11 +875,34 @@ void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth, const vector<MapPoint 
         float Projectd = Pc.at<float>(2);
         mvDepth[i] = Projectd;
         mvuRight[i] = kpU.pt.x-mbf/Projectd;
-        dcount++;
+
+      }
+    }
+
+    if(mvDepth[i] > 0)
+    {
+      // 将匹配的世界坐标系的特征点投影到当前坐标系下，然后判断投影点与实际点之间的差距
+      if(pMP)
+      {
+        cv::Mat Pw = pMP->GetWorldPos();
+        cv::Mat Pc = mTcw_real.rowRange(0,3).colRange(0,3)*Pw + mTcw_real.rowRange(0,3).col(3);
+        float u_p = fx*Pc.at<float>(0)/Pc.at<float>(2) + cx;
+        float v_p = fy*Pc.at<float>(1)/Pc.at<float>(2) + cy;
+
+        float d = (u_p - u)*(u_p - u) + (v_p - v)*(v_p - v);
+        if(d > 30)
+        {
+//          cout << "投影像素坐标为：("<< u_p << "," << v_p <<")，实际像素坐标为：(" << u << "," << v << ")" << endl;
+//          cout << "投影特征点的像素坐标与实际特征点的像素坐标的距离为：" << d << endl;
+          mvDepth[i] = -1;
+          mvuRight[i] = -1;
+          dcount++;
+        }
       }
     }
   }
-//  cout << "共还原了" << dcount << "个特征点的深度" << endl;
+//  cout<< endl << endl;
+//  cout << "共删去" << dcount << "个特征点" << endl;
 }
 
 void Frame::ComputeStereoFromRGBD(const cv::Mat &imDepth)
