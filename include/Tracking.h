@@ -33,6 +33,10 @@
 #include "MapDrawer.h"
 #include "Map.h"
 
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+
 #include <mutex>
 #include <condition_variable>
 #include <memory>
@@ -58,6 +62,8 @@ public:
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
     cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
+    // 传入真实位姿
+    cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp, const cv::Mat &Tcw_real);
     cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
@@ -227,8 +233,11 @@ protected:
     unsigned int mnLastKeyFrameId;
     unsigned int mnLastRelocFrameId;
 
-    //Motion Model
+    // Motion Model
     cv::Mat mVelocity;
+
+    // 真实位姿
+    cv::Mat mTcw_real_curr;
 
     //Color order (true RGB, false BGR, ignored if grayscale)
     bool mbRGB;

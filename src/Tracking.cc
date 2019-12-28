@@ -226,6 +226,52 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD,
 
   return mCurrentFrame.mTcw.clone();
 }
+
+// 增加了真实位姿
+cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB, const cv::Mat &imD,
+                                const double &timestamp, const cv::Mat &Tcw_real) {
+  mImGray = imRGB;
+  mImRGB = imRGB;
+  mImDepth = imD;
+  mImUsDepth = imD.clone();
+  mTimeStamp = timestamp;
+  mTcw_real_curr = Tcw_real;
+
+  // 转换为灰度图像
+  if (mImGray.channels() == 3) {
+    if (mbRGB)
+      cvtColor(mImGray, mImGray, CV_RGB2GRAY);
+    else
+      cvtColor(mImGray, mImGray, CV_BGR2GRAY);
+  } else if (mImGray.channels() == 4) {
+    if (mbRGB)
+      cvtColor(mImGray, mImGray, CV_RGBA2GRAY);
+    else
+      cvtColor(mImGray, mImGray, CV_BGRA2GRAY);
+  }
+
+  if ((fabs(mDepthMapFactor - 1.0f) > 1e-5) || mImDepth.type() != CV_32F)
+    mImDepth.convertTo(mImDepth, CV_32F, mDepthMapFactor);
+
+  // 创建当前帧
+  mCurrentFrame = Frame(mImGray, mImDepth, timestamp, mpORBextractorLeft,mpORBVocabulary,
+                        mK, mDistCoef, mbf, mThDepth, mTcw_real_curr, mpLastKeyFrame);
+
+  // NOTE:新增
+  // 参考帧不为空
+  // 估计当前帧与参考帧的位姿
+
+  //
+  // TODO:记录时间
+
+  cout << "开始跟踪" << endl;
+  Track();
+
+  cout << "最新关键帧的位姿为：" << endl << mpLastKeyFrame->Tcw_real << endl;
+//  cout << "当前参考帧的位姿为：" << endl << mpReferenceKF->Tcw_real << endl;
+
+  return mCurrentFrame.mTcw.clone();
+}
 // NOTE: 新增函数
 // NOTE: 为语义分割线程提供图像
 void Tracking::GetImg(const cv::Mat &img) {
@@ -577,7 +623,7 @@ void Tracking::Track() {
             std::chrono::steady_clock::now();
         mCurrentFrame = Frame(mImGray, mImDepth, mImUsDepth, mImS, mTimeStamp,
                               mpORBextractorLeft, mpORBVocabulary, mK,
-                              mDistCoef, mbf, mThDepth);
+                              mDistCoef, mbf, mThDepth, mTcw_real_curr,mpLastKeyFrame);
         std::chrono::steady_clock::time_point t2 =
             std::chrono::steady_clock::now();
         double ExtractORBTime =
@@ -699,7 +745,7 @@ void Tracking::StereoInitialization() {
     // 重新构造当前帧
     mCurrentFrame = Frame(mImGray, mImDepth, mImUsDepth, mImS, mTimeStamp,
                           mpORBextractorLeft, mpORBVocabulary, mK, mDistCoef,
-                          mbf, mThDepth);
+                          mbf, mThDepth, mTcw_real_curr);
     if (mCurrentFrame.bCreateOK) {
       mCurrentFrame.SetPose(cv::Mat::eye(4, 4, CV_32F));
     } else {
@@ -1225,6 +1271,8 @@ bool Tracking::NeedNewKeyFrame() {
 // TODO:
 // 找一个合适的位置增加一个等待语义分割的函数，以及一个滤出动态特征点的函数
 void Tracking::CreateNewKeyFrame() {
+  // NOTE: 输出
+  cout << "创建关键帧" << endl;
   if (!mpLocalMapper->SetNotStop(true))
     return;
 
@@ -1232,6 +1280,7 @@ void Tracking::CreateNewKeyFrame() {
 
   mpReferenceKF = pKF;
   mCurrentFrame.mpReferenceKF = pKF;
+  //pKF->Tcw_real = mTcw_real_curr;
 
   if (mSensor != System::MONOCULAR) {
     mCurrentFrame.UpdatePoseMatrices();

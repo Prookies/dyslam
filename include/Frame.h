@@ -22,6 +22,9 @@
 #define FRAME_H
 
 #include <vector>
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include "MapPoint.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
@@ -48,10 +51,16 @@ public:
     Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeStamp, ORBextractor* extractorLeft, ORBextractor* extractorRight, ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
 
     // Constructor for RGB-D cameras.
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
+//    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,
+//          ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth);
+
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc,
+          cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, cv::Mat Tcw_real = cv::Mat::eye(4,4,CV_32F), KeyFrame* refKF = nullptr);
 
     // 具有语义的帧构造函数
-    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat & imUsDepth, const cv::Mat &imS, const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef, const float &bf, const float &thDepth, KeyFrame* refKF = nullptr);
+    Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const cv::Mat & imUsDepth, const cv::Mat &imS,
+          const double &timeStamp, ORBextractor* extractor,ORBVocabulary* voc, cv::Mat &K, cv::Mat &distCoef,
+          const float &bf, const float &thDepth,  cv::Mat Tcw_real = cv::Mat::eye(4,4,CV_32F), KeyFrame* refKF = nullptr);
 
 
     // Constructor for Monocular cameras.
@@ -106,6 +115,8 @@ public:
 
     // Associate a "right" coordinate to a keypoint if there is valid depth in the depthmap.
     void ComputeStereoFromRGBD(const cv::Mat &imDepth);
+
+    void ComputeStereoFromRGBD(const cv::Mat &imDepth, const cv::Mat &Tcr_real);
 
     // Backprojects a keypoint (if stereo/depth info available) into 3D world coordinates.
     cv::Mat UnprojectStereo(const int &i);
@@ -174,6 +185,9 @@ public:
 
     // Camera pose.
     cv::Mat mTcw;
+
+    // 真实位姿
+    cv::Mat mTcw_real;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;

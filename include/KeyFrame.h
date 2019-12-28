@@ -27,6 +27,10 @@
 #include "ORBVocabulary.h"
 #include "ORBextractor.h"
 
+#include <Eigen/Core>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+
 #include <set>
 
 namespace ORB_SLAM2
@@ -182,11 +186,13 @@ public:
     const int mnMaxY;
     const cv::Mat mK;
 
-
+    // 真实位姿
+    cv::Mat Tcw_real;
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
 
     // SE3 Pose and camera center
+
     cv::Mat Tcw;
     cv::Mat Twc;
     cv::Mat Ow;
